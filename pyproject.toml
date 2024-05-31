@@ -1,36 +1,35 @@
 [tool.poetry]
 name = "acapy-vc-holder"
 version = "0.1.0"
-description = "Demonstrate signing LDP-VC creds with external suite"
+description = "Demonstrate holding LDP-VC creds with external provider"
 authors = ["Daniel Bluhm <dbluhm@pm.me>"]
 license = "Apache-2.0"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 
 
 [tool.poetry.group.acapy.dependencies]
-aries-cloudagent = "^0.12.1"
+aries-cloudagent = {git = "https://github.com/dbluhm/aries-cloudagent-python.git", rev = "acdc80db738671163bffd51e00f765d47722279e", extras=["askar"]}
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.2.0"
-ruff = "^0.3.2"
+ruff = "^0.4.5"
 pre-commit = "^3.6.2"
 
 
 [tool.poetry.group.demo.dependencies]
-controller = {git = "https://github.com/Indicio-tech/acapy-minimal-example"}
+acapy-controller = "^0.1.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-select = ["E", "F", "C", "D"]
+lint.select = ["E", "F", "C", "D"]
 
-ignore = [
+lint.ignore = [
     # Google Python Doc Style
     "D203", "D204", "D213", "D215", "D400", "D401", "D404", "D406", "D407",
     "D408", "D409", "D413",

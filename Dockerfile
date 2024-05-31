@@ -1,10 +1,18 @@
-FROM ghcr.io/hyperledger/aries-cloudagent-python:py3.9-nightly-2024-03-13
+FROM python:3.10-slim-bookworm as base
+WORKDIR /usr/src/app
 
-COPY ./pyproject.toml ./README.md ./
+RUN apt-get update && apt-get install -y curl && apt-get clean
+ENV POETRY_VERSION=1.7.1
+ENV POETRY_HOME=/opt/poetry
+RUN curl -sSL https://install.python-poetry.org | python -
+
+ENV PATH="/opt/poetry/bin:$PATH"
+RUN poetry config virtualenvs.in-project true
+
+# Setup project
+COPY pyproject.toml poetry.lock README.md ./
 RUN mkdir acapy_vc_holder && touch acapy_vc_holder/__init__.py
-# Must install ACA-Py from PR commit since not merged yet
-RUN yes | pip uninstall aries-cloudagent
-RUN pip install git+https://github.com/sicpa-dlab/aries-cloudagent-python@505263411782c488f88952c97d857d4bd2772661
-RUN pip install -e .
+RUN poetry install --with acapy
 
 COPY ./acapy_vc_holder ./acapy_vc_holder
+ENTRYPOINT ["poetry", "run", "aca-py"]

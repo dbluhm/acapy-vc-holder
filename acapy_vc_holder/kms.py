@@ -1,58 +1,9 @@
 """KMS Interface."""
 
-from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import List, Mapping, Optional, Union
 
 from aiohttp import ClientSession
-from aries_cloudagent.wallet.util import b64_to_bytes, bytes_to_b64
-
-
-KeyAlg = Literal[
-    "ed25519",
-    "x25519",
-    "p256",
-    "p384",
-    "p521",
-    "secp256k1",
-    "bls12-381g1",
-    "bls12-381g2",
-]
-
-
-@dataclass
-class KeyResult:
-    """Key generation result."""
-
-    kid: str
-    jwk: dict
-    b58: str
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "KeyResult":
-        """Create a KeyResult from a dictionary."""
-        return cls(
-            kid=data["kid"],
-            jwk=data["jwk"],
-            b58=data["b58"],
-        )
-
-
-@dataclass
-class AssociateResult:
-    """Key association result."""
-
-    kid: str
-    wallet_id: str
-    alias: str
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "AssociateResult":
-        """Create an AssociateResult from a dictionary."""
-        return cls(
-            kid=data["kid"],
-            wallet_id=data["kid"],
-            alias=data["alias"],
-        )
+from aries_cloudagent.storage.vc_holder.vc_record import VCRecord
 
 
 class MiniKMS:
@@ -98,54 +49,91 @@ class MiniKMS:
         """Return headers."""
         return {"X-Profile": self.profile or "default"}
 
-    async def generate_key(self, alg: KeyAlg) -> KeyResult:
-        """Generate a new key pair."""
+    async def store_credential(self, cred: VCRecord):
+        """Store credential."""
         async with self.client.post(
-            "/key/generate", headers=self.headers(), json={"alg": alg}
+            "/vc-holder/store", headers=self.headers(), json=cred.serialize()
         ) as resp:
             if not resp.ok:
-                raise ValueError(f"Error generating key: {resp.status} {resp.reason}")
+                raise ValueError(f"Error storing cred: {resp.status} {resp.reason}")
 
             body = await resp.json()
 
-        return KeyResult.from_dict(body)
+        return body["record_id"]
 
-    async def associate_key(self, kid: str, alias: str) -> AssociateResult:
-        """Associate a key with additional identifiers."""
-        async with self.client.post(
-            f"/key/{kid}/associate", headers=self.headers(), json={"alias": alias}
-        ) as resp:
-            if not resp.ok:
-                raise ValueError(f"Error associating key: {resp.status} {resp.reason}")
-
-            body = await resp.json()
-            return AssociateResult.from_dict(body)
-
-    async def get_key_by_alias(self, alias: str) -> KeyResult:
-        """Retrieve a key by identifiers."""
+    async def retrieve_credential_by_id(self, record_id: str) -> VCRecord:
+        """Retrieve cred by id."""
         async with self.client.get(
-            "/key", headers=self.headers(), params={"alias": alias}
+            f"/vc-holder/credential/record/{record_id}", headers=self.headers()
         ) as resp:
             if not resp.ok:
-                message = f"{resp.status} {resp.reason}"
-                if "json" in resp.headers.getone("Content-Type"):
-                    body = await resp.json()
-                    message = f"{message}; {body}"
-
-                raise ValueError(f"Error retrieving key: {message}")
+                raise ValueError(
+                    f"Error retrieving cred by id: {resp.status} {resp.reason}"
+                )
 
             body = await resp.json()
-            return KeyResult.from_dict(body)
 
-    async def sign(self, kid: str, data: bytes) -> bytes:
-        """Sign a message with the private key."""
-        data_enc = bytes_to_b64(data, urlsafe=True, pad=True)
+        return VCRecord.deserialize(body)
+
+    async def retrieve_credential_by_given_id(self, given_id: str) -> VCRecord:
+        """Retrieve cred by id."""
+        async with self.client.get(
+            f"/vc-holder/credential/given/{given_id}", headers=self.headers()
+        ) as resp:
+            if not resp.ok:
+                raise ValueError(
+                    f"Error retrieving cred by given id: {resp.status} {resp.reason}"
+                )
+
+            body = await resp.json()
+
+        return VCRecord.deserialize(body)
+
+    async def delete_credential(self, record_id: str):
+        """Delete a credential by id."""
+        async with self.client.delete(
+            f"/vc-holder/credential/record/{record_id}", headers=self.headers()
+        ) as resp:
+            if not resp.ok:
+                raise ValueError(f"Error deleting cred: {resp.status} {resp.reason}")
+
+    async def search_credentials(
+        self,
+        contexts: Optional[List[str]] = None,
+        types: Optional[List[str]] = None,
+        schema_ids: Optional[List[str]] = None,
+        issuer_id: Optional[str] = None,
+        subject_ids: Optional[str] = None,
+        proof_types: Optional[List[str]] = None,
+        given_id: Optional[str] = None,
+        tag_query: Optional[Mapping] = None,
+        pd_uri_list: Optional[List[str]] = None,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> List[VCRecord]:
+        """Search for credentials."""
         async with self.client.post(
-            "/sign", headers=self.headers(), json={"kid": kid, "data": data_enc}
+            "/vc-holder/credentials",
+            headers=self.headers(),
+            json={
+                "contexts": contexts,
+                "types": types,
+                "schema_ids": schema_ids,
+                "issuer_id": issuer_id,
+                "subject_ids": subject_ids,
+                "proof_types": proof_types,
+                "given_id": given_id,
+                "tag_query": tag_query,
+                "pd_uri_list": pd_uri_list,
+                "offset": offset,
+                "limit": limit,
+            },
         ) as resp:
             if not resp.ok:
-                raise ValueError(f"Error signing message: {resp.status} {resp.reason}")
-            body = await resp.json()
-            sig_data = b64_to_bytes(body["sig"], urlsafe=True)
+                raise ValueError(
+                    f"Error searching for credentials: {resp.status} {resp.reason}"
+                )
 
-        return sig_data
+            body = await resp.json()
+
+        return [VCRecord.deserialize(record) for record in body["records"]]

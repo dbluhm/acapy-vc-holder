@@ -3,13 +3,12 @@
 from os import getenv
 
 from aries_cloudagent.config.injection_context import InjectionContext
-from aries_cloudagent.vc.vc_ld.external_suite import ExternalSuiteProvider
-from aries_cloudagent.wallet.default_verification_key_strategy import (
-    BaseVerificationKeyStrategy,
-)
+from aries_cloudagent.config.provider import ClassProvider
+from aries_cloudagent.core.profile import Profile
+from aries_cloudagent.storage.vc_holder.base import VCHolder
 
 from .kms import MiniKMS
-from .provider import KMSVerificationKeyStrategy, KmsSuiteProvider
+from .provider import ExternalVCHolder
 
 
 async def setup(context: InjectionContext):
@@ -21,8 +20,9 @@ async def setup(context: InjectionContext):
     kms_client = MiniKMS(base_url=KMS_BASE_URL)
     context.injector.bind_instance(MiniKMS, kms_client)
 
-    suite = KmsSuiteProvider(kms_client)
-    context.injector.bind_instance(ExternalSuiteProvider, suite)
-
-    key_strat = KMSVerificationKeyStrategy()
-    context.injector.bind_instance(BaseVerificationKeyStrategy, key_strat)
+    context.injector.bind_provider(
+        VCHolder,
+        ClassProvider(
+            ExternalVCHolder, profile=ClassProvider.Inject(Profile), kms=kms_client
+        ),
+    )
