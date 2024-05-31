@@ -1,8 +1,8 @@
-# ACA-Py External JSON-LD Signer
+# ACA-Py External VC Holder
 
-A quick demonstration of using an external service for signing JSON-LD creds.
+A quick demonstration of using an external service for holding JSON-LD creds.
 
-The External Provider component is added to ACA-Py in [PR #2835](https://github.com/hyperledger/aries-cloudagent-python/pull/2835).
+The External VC Holder component is currently dependent on unmerged upstream changes to ACA-Py.
 
 The KMS Service used by this demo can be found here: [dbluhm/mini-kms](https://github.com/dbluhm/mini-kms).
 
@@ -26,7 +26,7 @@ There should be one request to the key generation endpoint and one to the signin
 Logs from the ACA-Py instance may also be of interest:
 
 ```sh
-docker-compose logs issuer
+docker-compose logs holder
 ```
 
 
